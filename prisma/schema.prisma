@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  source      String   // "snippet" | "github"
+  sourceRef   String?  // repo/PR URL if applicable, null for pasted snippets
+  language    String?
+  summary     String   @db.Text
+  issues      Json     // structured list of issues found
+  score       Int      // 0-100 overall quality score
+  rawCode     String   @db.Text
+  createdAt   DateTime @default(now())
+}
