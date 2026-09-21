@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-checks:
+    name: Lint, type-check, test, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npx next lint
+
+      - name: Run unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+        env:
+          # A placeholder is enough here — Prisma only needs a syntactically
+          # valid connection string to generate its client and for `next build`
+          # to succeed. No real database connection happens during build.
+          DATABASE_URL: "postgresql://user:password@localhost:5432/placeholder"
