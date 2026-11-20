@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { reviewCode } from "@/lib/groq";
+import { reviewCode, isReviewFocus } from "@/lib/groq";
 import { fetchGithubContent } from "@/lib/github";
 
 export const maxDuration = 60;
@@ -8,10 +8,11 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { mode, code, githubUrl } = body as {
+    const { mode, code, githubUrl, focus } = body as {
       mode: "snippet" | "github";
       code?: string;
       githubUrl?: string;
+      focus?: string;
     };
 
     let codeToReview = "";
@@ -35,13 +36,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
     }
 
-    // Guard against absurdly large payloads going to the model
+    // Guard against large payloads (Groq free tier caps tokens per minute)
     const MAX_CHARS = 20000;
     if (codeToReview.length > MAX_CHARS) {
       codeToReview = codeToReview.slice(0, MAX_CHARS) + "\n\n/* ...truncated for review... */";
     }
 
-    const result = await reviewCode(codeToReview, contextLabel);
+    const result = await reviewCode(
+      codeToReview,
+      contextLabel,
+      isReviewFocus(focus) ? focus : "general"
+    );
 
     const saved = await prisma.review.create({
       data: {

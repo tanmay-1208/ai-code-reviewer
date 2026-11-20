@@ -1,5 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { cleanJsonResponse } from "../groq";
+import { isReviewFocus, FOCUS_INSTRUCTIONS } from "../groq";
+
+describe("review focus", () => {
+  it("accepts known focus values", () => {
+    expect(isReviewFocus("security")).toBe(true);
+  });
+  it("rejects unknown values", () => {
+    expect(isReviewFocus("hack")).toBe(false);
+    expect(isReviewFocus(undefined)).toBe(false);
+  });
+  it("has an instruction for every focus except general", () => {
+    expect(FOCUS_INSTRUCTIONS.security).toContain("security");
+    expect(FOCUS_INSTRUCTIONS.general).toBe("");
+  });
+});
 
 describe("cleanJsonResponse", () => {
   it("returns valid JSON unchanged", () => {

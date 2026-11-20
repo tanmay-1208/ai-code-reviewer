@@ -37,6 +37,14 @@ const severityStyles: Record<string, string> = {
   suggestion: "border-sky-500/40 bg-sky-500/10 text-sky-300",
 };
 
+const focusOptions = [
+  { value: "general", label: "General review" },
+  { value: "security", label: "Security" },
+  { value: "performance", label: "Performance" },
+  { value: "readability", label: "Readability" },
+  { value: "beginner", label: "Beginner-friendly" },
+];
+
 function ScoreBadge({ score }: { score: number }) {
   const color =
     score >= 80 ? "text-emerald-400" : score >= 50 ? "text-amber-400" : "text-red-400";
@@ -52,6 +60,7 @@ export default function Home() {
   const [mode, setMode] = useState<"snippet" | "github">("snippet");
   const [code, setCode] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
+  const [focus, setFocus] = useState("general");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<Review | null>(null);
@@ -82,7 +91,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          mode === "snippet" ? { mode, code } : { mode, githubUrl }
+          mode === "snippet" ? { mode, code, focus } : { mode, githubUrl, focus }
         ),
       });
       const data = await res.json();
@@ -150,6 +159,24 @@ export default function Home() {
             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         )}
+
+        <div className="mt-4">
+          <label htmlFor="focus" className="block text-sm text-slate-400 mb-1">
+            Review focus
+          </label>
+          <select
+            id="focus"
+            value={focus}
+            onChange={(e) => setFocus(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            {focusOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <button
           type="submit"

@@ -23,6 +23,37 @@ export interface ReviewResult {
   issues: ReviewIssue[];
 }
 
+export type ReviewFocus =
+  | "general"
+  | "security"
+  | "performance"
+  | "readability"
+  | "beginner";
+
+/**
+ * Extra instruction added to the user prompt for each review focus.
+ * "general" adds nothing, so the default behaviour is unchanged.
+ */
+export const FOCUS_INSTRUCTIONS: Record<ReviewFocus, string> = {
+  general: "",
+  security:
+    "FOCUS: Prioritise security. Look for injection, XSS, unsafe input handling, secrets in code, weak authentication and unsafe dependencies. Rank security problems as critical or warning before anything else.",
+  performance:
+    "FOCUS: Prioritise performance. Look for unnecessary loops, N+1 queries, blocking calls, memory leaks and wasted re-renders.",
+  readability:
+    "FOCUS: Prioritise readability and maintainability. Look for naming, function length, duplication, missing types and unclear structure.",
+  beginner:
+    "FOCUS: The author is a beginner. Explain each issue in simple language, define any jargon, and keep every suggestion short and easy to follow.",
+};
+
+/** Type guard so API input can be validated without trusting the client. */
+export function isReviewFocus(value: unknown): value is ReviewFocus {
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(FOCUS_INSTRUCTIONS, value)
+  );
+}
+
 const SYSTEM_PROMPT = `You are a senior software engineer performing a code review.
 Analyze the given code for bugs, security issues, performance problems, readability,
 and best-practice violations. Be specific and reference line numbers where possible.
@@ -53,10 +84,18 @@ export function cleanJsonResponse(raw: string): string {
   return raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
 }
 
-export async function reviewCode(code: string, context?: string): Promise<ReviewResult> {
-  const userPrompt = context
-    ? `Context: ${context}\n\nReview this code:\n\n${code}`
-    : `Review this code:\n\n${code}`;
+export async function reviewCode(
+  code: string,
+  context?: string,
+  focus: ReviewFocus = "general"
+): Promise<ReviewResult> {
+  const userPrompt = [
+    FOCUS_INSTRUCTIONS[focus],
+    context ? `Context: ${context}` : "",
+    `Review this code:\n\n${code}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
