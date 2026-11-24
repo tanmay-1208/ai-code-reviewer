@@ -46,15 +46,15 @@ const focusOptions = [
   { value: "beginner", label: "Beginner-friendly" },
 ];
 
+const card = "bg-slate-900 border border-slate-800 rounded-xl p-5";
+
 function scoreHex(score: number) {
   return score >= 80 ? "#34d399" : score >= 50 ? "#fbbf24" : "#f87171";
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 80 ? "text-emerald-400" : score >= 50 ? "text-amber-400" : "text-red-400";
   return (
-    <div className={`text-3xl font-bold ${color}`}>
+    <div className="text-3xl font-bold" style={{ color: scoreHex(score) }}>
       {score}
       <span className="text-sm text-slate-400 font-normal">/100</span>
     </div>
@@ -63,20 +63,30 @@ function ScoreBadge({ score }: { score: number }) {
 
 function ScoreTrend({ history }: { history: HistoryItem[] }) {
   const trend = useMemo(() => buildTrend(history), [history]);
-  if (trend.points.length < 2) return null;
 
-  const W = 640;
-  const H = 220;
-  const PAD = 28;
+  if (trend.points.length < 2) {
+    return (
+      <section className={card}>
+        <h2 className="text-base font-semibold">Score Trend</h2>
+        <p className="text-sm text-slate-500 mt-2">
+          Run at least two reviews to see how your code quality changes.
+        </p>
+      </section>
+    );
+  }
+
+  const W = 480;
+  const H = 190;
+  const PAD = 26;
   const coords = toSvgPoints(trend.points, W, H, PAD);
   const line = coords.map((c) => `${c.x},${c.y}`).join(" ");
-  const gridValues = [0, 25, 50, 75, 100];
+  const gridValues = [0, 50, 100];
   const change = trend.change ?? 0;
 
   const stats = [
-    { label: "Average", value: `${trend.average}` },
-    { label: "Best", value: `${trend.best}` },
-    { label: "Worst", value: `${trend.worst}` },
+    { label: "Avg", value: `${trend.average}`, color: "text-slate-100" },
+    { label: "Best", value: `${trend.best}`, color: "text-emerald-400" },
+    { label: "Worst", value: `${trend.worst}`, color: "text-red-400" },
     {
       label: "Change",
       value: `${change > 0 ? "+" : ""}${change}`,
@@ -86,26 +96,24 @@ function ScoreTrend({ history }: { history: HistoryItem[] }) {
   ];
 
   return (
-    <section className="mt-10 bg-slate-900 border border-slate-800 rounded-xl p-5">
-      <h2 className="text-lg font-semibold">Score Trend</h2>
-      <p className="text-slate-400 text-sm mt-1">
-        Code quality across your last {trend.points.length} reviews, oldest to newest.
-      </p>
+    <section className={card}>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-base font-semibold">Score Trend</h2>
+        <span className="text-xs text-slate-500">last {trend.points.length} reviews</span>
+      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+      <div className="grid grid-cols-4 gap-2 mt-3">
         {stats.map((s) => (
-          <div key={s.label} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-            <div className="text-xs text-slate-500">{s.label}</div>
-            <div className={`text-xl font-semibold ${s.color ?? "text-slate-100"}`}>
-              {s.value}
-            </div>
+          <div key={s.label} className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5">
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">{s.label}</div>
+            <div className={`text-lg font-semibold leading-tight ${s.color}`}>{s.value}</div>
           </div>
         ))}
       </div>
 
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto mt-4"
+        className="w-full h-auto mt-3"
         role="img"
         aria-label="Line chart of review scores over time"
       >
@@ -193,156 +201,193 @@ export default function Home() {
     }
   }
 
+  const counts = review
+    ? {
+        critical: review.issues.filter((i) => i.severity === "critical").length,
+        warning: review.issues.filter((i) => i.severity === "warning").length,
+        suggestion: review.issues.filter((i) => i.severity === "suggestion").length,
+      }
+    : null;
+
   return (
-    <main className="max-w-4xl mx-auto px-4 py-10">
-      <header className="mb-8">
+    <main className="max-w-6xl mx-auto px-4 py-8">
+      <header className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">AI Code Reviewer</h1>
         <p className="text-slate-400 mt-1">
           Paste a snippet or drop a GitHub file / PR URL to get an instant AI review.
         </p>
       </header>
 
-      <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <div className="flex gap-2 mb-4">
-          <button
-            type="button"
-            onClick={() => setMode("snippet")}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-              mode === "snippet"
-                ? "bg-indigo-500 text-white"
-                : "bg-slate-800 text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Paste Code
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("github")}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-              mode === "github"
-                ? "bg-indigo-500 text-white"
-                : "bg-slate-800 text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            GitHub URL
-          </button>
-        </div>
-
-        {mode === "snippet" ? (
-          <textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="Paste your code here..."
-            rows={12}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        ) : (
-          <input
-            type="url"
-            value={githubUrl}
-            onChange={(e) => setGithubUrl(e.target.value)}
-            placeholder="https://github.com/owner/repo/blob/main/src/file.ts or .../pull/123"
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        )}
-
-        <div className="mt-4">
-          <label htmlFor="focus" className="block text-sm text-slate-400 mb-1">
-            Review focus
-          </label>
-          <select
-            id="focus"
-            value={focus}
-            onChange={(e) => setFocus(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            {focusOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-4 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-5 py-2 rounded-lg transition"
-        >
-          {loading ? "Reviewing..." : "Run Review"}
-        </button>
-      </form>
-
-      {error && (
-        <div className="mt-4 border border-red-500/40 bg-red-500/10 text-red-300 rounded-lg p-3 text-sm">
-          {error}
-        </div>
-      )}
-
-      {review && (
-        <section className="mt-8 bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold">Review Result</h2>
-              <p className="text-slate-400 text-sm mt-1">{review.language}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+        {/* LEFT: input + result */}
+        <div className="lg:col-span-3 space-y-5">
+          <form onSubmit={handleSubmit} className={card}>
+            <div className="flex gap-2 mb-4">
+              {(["snippet", "github"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                    mode === m
+                      ? "bg-indigo-500 text-white"
+                      : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  {m === "snippet" ? "Paste Code" : "GitHub URL"}
+                </button>
+              ))}
             </div>
-            <ScoreBadge score={review.score} />
-          </div>
 
-          <p className="mt-4 text-slate-200 leading-relaxed">{review.summary}</p>
-
-          <div className="mt-6 space-y-3">
-            {review.issues.map((issue, i) => (
-              <div
-                key={i}
-                className={`border rounded-lg p-3 ${severityStyles[issue.severity] || severityStyles.suggestion}`}
-              >
-                <div className="flex items-center justify-between text-xs uppercase tracking-wide font-semibold opacity-80">
-                  <span>{issue.severity}</span>
-                  {issue.line !== null && <span>Line {issue.line}</span>}
-                </div>
-                <div className="mt-1 font-medium text-slate-100">{issue.title}</div>
-                <p className="text-sm text-slate-300 mt-1">{issue.description}</p>
-                <p className="text-sm mt-2 text-slate-400">
-                  <span className="font-medium text-slate-300">Suggestion: </span>
-                  {issue.suggestion}
-                </p>
-              </div>
-            ))}
-            {review.issues.length === 0 && (
-              <p className="text-sm text-slate-400">No issues found. Nice work!</p>
+            {mode === "snippet" ? (
+              <textarea
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="Paste your code here..."
+                rows={9}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            ) : (
+              <input
+                type="url"
+                value={githubUrl}
+                onChange={(e) => setGithubUrl(e.target.value)}
+                placeholder="https://github.com/owner/repo/blob/main/src/file.ts or .../pull/123"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             )}
-          </div>
-        </section>
-      )}
 
-      <ScoreTrend history={history} />
-
-      {history.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Recent Reviews</h2>
-          <div className="space-y-2">
-            {history.map((h) => (
-              <div
-                key={h.id}
-                className="border border-slate-800 rounded-lg p-3 flex items-center justify-between gap-4 bg-slate-900"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm text-slate-200 truncate">
-                    {h.sourceRef || `Snippet review (${h.language || "unknown"})`}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {new Date(h.createdAt).toLocaleString()}
-                  </p>
-                </div>
-                <div className={`text-sm font-semibold shrink-0`} style={{ color: scoreHex(h.score) }}>
-                  {h.score}/100
-                </div>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="flex-1">
+                <label htmlFor="focus" className="block text-xs text-slate-400 mb-1">
+                  Review focus
+                </label>
+                <select
+                  id="focus"
+                  value={focus}
+                  onChange={(e) => setFocus(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {focusOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-6 py-2 rounded-lg transition"
+              >
+                {loading ? "Reviewing..." : "Run Review"}
+              </button>
+            </div>
+          </form>
+
+          {error && (
+            <div className="border border-red-500/40 bg-red-500/10 text-red-300 rounded-lg p-3 text-sm">
+              {error}
+            </div>
+          )}
+
+          {loading && (
+            <div className={`${card} animate-pulse text-slate-400 text-sm`}>
+              Analysing your code...
+            </div>
+          )}
+
+          {!review && !loading && !error && (
+            <div className={`${card} text-center text-slate-500 text-sm py-10`}>
+              Your review will appear here.
+            </div>
+          )}
+
+          {review && counts && (
+            <section className={card}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Review Result</h2>
+                  <p className="text-slate-400 text-sm mt-0.5">{review.language}</p>
+                </div>
+                <ScoreBadge score={review.score} />
+              </div>
+
+              <p className="mt-3 text-slate-200 text-sm leading-relaxed">{review.summary}</p>
+
+              <div className="flex flex-wrap gap-2 mt-4">
+                {(["critical", "warning", "suggestion"] as const).map((s) => (
+                  <span
+                    key={s}
+                    className={`border rounded-full px-3 py-0.5 text-xs font-medium ${severityStyles[s]}`}
+                  >
+                    {counts[s]} {s}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-4 space-y-3 max-h-[26rem] overflow-y-auto pr-1">
+                {review.issues.map((issue, i) => (
+                  <div
+                    key={i}
+                    className={`border rounded-lg p-3 ${severityStyles[issue.severity] || severityStyles.suggestion}`}
+                  >
+                    <div className="flex items-center justify-between text-xs uppercase tracking-wide font-semibold opacity-80">
+                      <span>{issue.severity}</span>
+                      {issue.line !== null && <span>Line {issue.line}</span>}
+                    </div>
+                    <div className="mt-1 font-medium text-slate-100">{issue.title}</div>
+                    <p className="text-sm text-slate-300 mt-1">{issue.description}</p>
+                    <p className="text-sm mt-2 text-slate-400">
+                      <span className="font-medium text-slate-300">Suggestion: </span>
+                      {issue.suggestion}
+                    </p>
+                  </div>
+                ))}
+                {review.issues.length === 0 && (
+                  <p className="text-sm text-slate-400">No issues found. Nice work!</p>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+
+        {/* RIGHT: trend + history */}
+        <aside className="lg:col-span-2 space-y-5 lg:sticky lg:top-6">
+          <ScoreTrend history={history} />
+
+          <section className={card}>
+            <h2 className="text-base font-semibold mb-3">Recent Reviews</h2>
+            {history.length === 0 ? (
+              <p className="text-sm text-slate-500">No reviews yet.</p>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {history.map((h) => (
+                  <div
+                    key={h.id}
+                    className="border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between gap-3 bg-slate-950"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm text-slate-200 truncate">
+                        {h.sourceRef || `Snippet review (${h.language || "unknown"})`}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {new Date(h.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div
+                      className="text-sm font-semibold shrink-0"
+                      style={{ color: scoreHex(h.score) }}
+                    >
+                      {h.score}/100
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </aside>
+      </div>
     </main>
   );
 }
