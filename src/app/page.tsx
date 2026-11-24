@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { buildTrend, toSvgPoints } from "@/lib/trend";
 
 interface ReviewIssue {
   severity: "critical" | "warning" | "suggestion";
@@ -45,6 +46,10 @@ const focusOptions = [
   { value: "beginner", label: "Beginner-friendly" },
 ];
 
+function scoreHex(score: number) {
+  return score >= 80 ? "#34d399" : score >= 50 ? "#fbbf24" : "#f87171";
+}
+
 function ScoreBadge({ score }: { score: number }) {
   const color =
     score >= 80 ? "text-emerald-400" : score >= 50 ? "text-amber-400" : "text-red-400";
@@ -53,6 +58,87 @@ function ScoreBadge({ score }: { score: number }) {
       {score}
       <span className="text-sm text-slate-400 font-normal">/100</span>
     </div>
+  );
+}
+
+function ScoreTrend({ history }: { history: HistoryItem[] }) {
+  const trend = useMemo(() => buildTrend(history), [history]);
+  if (trend.points.length < 2) return null;
+
+  const W = 640;
+  const H = 220;
+  const PAD = 28;
+  const coords = toSvgPoints(trend.points, W, H, PAD);
+  const line = coords.map((c) => `${c.x},${c.y}`).join(" ");
+  const gridValues = [0, 25, 50, 75, 100];
+  const change = trend.change ?? 0;
+
+  const stats = [
+    { label: "Average", value: `${trend.average}` },
+    { label: "Best", value: `${trend.best}` },
+    { label: "Worst", value: `${trend.worst}` },
+    {
+      label: "Change",
+      value: `${change > 0 ? "+" : ""}${change}`,
+      color:
+        change > 0 ? "text-emerald-400" : change < 0 ? "text-red-400" : "text-slate-300",
+    },
+  ];
+
+  return (
+    <section className="mt-10 bg-slate-900 border border-slate-800 rounded-xl p-5">
+      <h2 className="text-lg font-semibold">Score Trend</h2>
+      <p className="text-slate-400 text-sm mt-1">
+        Code quality across your last {trend.points.length} reviews, oldest to newest.
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+        {stats.map((s) => (
+          <div key={s.label} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+            <div className="text-xs text-slate-500">{s.label}</div>
+            <div className={`text-xl font-semibold ${s.color ?? "text-slate-100"}`}>
+              {s.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto mt-4"
+        role="img"
+        aria-label="Line chart of review scores over time"
+      >
+        {gridValues.map((v) => {
+          const y = PAD + (1 - v / 100) * (H - PAD * 2);
+          return (
+            <g key={v}>
+              <line x1={PAD} x2={W - PAD} y1={y} y2={y} stroke="#1e293b" strokeWidth="1" />
+              <text x={PAD - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#64748b">
+                {v}
+              </text>
+            </g>
+          );
+        })}
+        <polyline
+          points={line}
+          fill="none"
+          stroke="#6366f1"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {coords.map((c, i) => (
+          <circle key={i} cx={c.x} cy={c.y} r="4" fill={scoreHex(trend.points[i].score)}>
+            <title>
+              {`${trend.points[i].score}/100 - ${new Date(
+                trend.points[i].createdAt
+              ).toLocaleString()}`}
+            </title>
+          </circle>
+        ))}
+      </svg>
+    </section>
   );
 }
 
@@ -230,6 +316,8 @@ export default function Home() {
         </section>
       )}
 
+      <ScoreTrend history={history} />
+
       {history.length > 0 && (
         <section className="mt-10">
           <h2 className="text-lg font-semibold mb-3">Recent Reviews</h2>
@@ -247,15 +335,7 @@ export default function Home() {
                     {new Date(h.createdAt).toLocaleString()}
                   </p>
                 </div>
-                <div
-                  className={`text-sm font-semibold shrink-0 ${
-                    h.score >= 80
-                      ? "text-emerald-400"
-                      : h.score >= 50
-                      ? "text-amber-400"
-                      : "text-red-400"
-                  }`}
-                >
+                <div className={`text-sm font-semibold shrink-0`} style={{ color: scoreHex(h.score) }}>
                   {h.score}/100
                 </div>
               </div>
