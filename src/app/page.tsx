@@ -1,393 +1,180 @@
-"use client";
+import Link from "next/link";
 
-import { useEffect, useMemo, useState } from "react";
-import { buildTrend, toSvgPoints } from "@/lib/trend";
-
-interface ReviewIssue {
-  severity: "critical" | "warning" | "suggestion";
-  line: number | null;
-  title: string;
-  description: string;
-  suggestion: string;
-}
-
-interface Review {
-  id: string;
-  source: string;
-  sourceRef: string | null;
-  language: string | null;
-  summary: string;
-  issues: ReviewIssue[];
-  score: number;
-  createdAt: string;
-}
-
-interface HistoryItem {
-  id: string;
-  source: string;
-  sourceRef: string | null;
-  language: string | null;
-  summary: string;
-  score: number;
-  createdAt: string;
-}
-
-const severityStyles: Record<string, string> = {
-  critical: "border-red-500/40 bg-red-500/10 text-red-300",
-  warning: "border-amber-500/40 bg-amber-500/10 text-amber-300",
-  suggestion: "border-sky-500/40 bg-sky-500/10 text-sky-300",
-};
-
-const focusOptions = [
-  { value: "general", label: "General review" },
-  { value: "security", label: "Security" },
-  { value: "performance", label: "Performance" },
-  { value: "readability", label: "Readability" },
-  { value: "beginner", label: "Beginner-friendly" },
+const features = [
+  {
+    title: "Snippet or GitHub URL",
+    text: "Paste code directly, or drop a link to a GitHub file or pull request and we fetch it for you.",
+  },
+  {
+    title: "Focused reviews",
+    text: "Choose Security, Performance, Readability or Beginner-friendly so the review looks at what matters to you.",
+  },
+  {
+    title: "Structured results",
+    text: "Every review gives a 0-100 score and issues ranked critical, warning or suggestion, with line numbers and fixes.",
+  },
+  {
+    title: "History and score trend",
+    text: "Every review is saved, and a trend chart shows whether your code quality is improving over time.",
+  },
 ];
 
-const card = "bg-slate-900 border border-slate-800 rounded-xl p-5";
+const steps = [
+  { n: "1", title: "Submit your code", text: "Paste a snippet or a GitHub file / PR link." },
+  { n: "2", title: "Pick a focus", text: "General, security, performance, readability or beginner." },
+  { n: "3", title: "Get your review", text: "A score, ranked issues and concrete fixes in seconds." },
+];
 
-function scoreHex(score: number) {
-  return score >= 80 ? "#34d399" : score >= 50 ? "#fbbf24" : "#f87171";
-}
+const stack = ["Next.js 14", "TypeScript", "Tailwind CSS", "Prisma", "PostgreSQL (Neon)", "Groq API", "Vercel"];
 
-function ScoreBadge({ score }: { score: number }) {
+const team = ["Tanmay Singh", "Ayush Bindal", "Aditya Kumar", "Ayush Raj Dixit"];
+
+export default function Landing() {
   return (
-    <div className="text-3xl font-bold" style={{ color: scoreHex(score) }}>
-      {score}
-      <span className="text-sm text-slate-400 font-normal">/100</span>
-    </div>
-  );
-}
+    <main className="max-w-6xl mx-auto px-4">
+      {/* Nav */}
+      <nav className="flex items-center justify-between py-5">
+        <span className="font-semibold tracking-tight">AI Code Reviewer</span>
+        <Link
+          href="/review"
+          className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-1.5 rounded-lg transition"
+        >
+          Open app
+        </Link>
+      </nav>
 
-function ScoreTrend({ history }: { history: HistoryItem[] }) {
-  const trend = useMemo(() => buildTrend(history), [history]);
-
-  if (trend.points.length < 2) {
-    return (
-      <section className={card}>
-        <h2 className="text-base font-semibold">Score Trend</h2>
-        <p className="text-sm text-slate-500 mt-2">
-          Run at least two reviews to see how your code quality changes.
+      {/* Hero */}
+      <section className="text-center py-16 sm:py-24">
+        <span className="inline-block text-xs font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 rounded-full px-3 py-1">
+          Mini Project II · Group 10
+        </span>
+        <h1 className="mt-5 text-4xl sm:text-6xl font-bold tracking-tight">
+          Review code in{" "}
+          <span className="bg-gradient-to-r from-indigo-400 to-sky-400 bg-clip-text text-transparent">
+            seconds
+          </span>
+          , not hours
+        </h1>
+        <p className="mt-5 text-slate-400 text-lg max-w-2xl mx-auto">
+          Paste a snippet or a GitHub link and get a scored, line-by-line review covering bugs,
+          security, performance and readability, powered by AI.
         </p>
-      </section>
-    );
-  }
-
-  const W = 480;
-  const H = 190;
-  const PAD = 26;
-  const coords = toSvgPoints(trend.points, W, H, PAD);
-  const line = coords.map((c) => `${c.x},${c.y}`).join(" ");
-  const gridValues = [0, 50, 100];
-  const change = trend.change ?? 0;
-
-  const stats = [
-    { label: "Avg", value: `${trend.average}`, color: "text-slate-100" },
-    { label: "Best", value: `${trend.best}`, color: "text-emerald-400" },
-    { label: "Worst", value: `${trend.worst}`, color: "text-red-400" },
-    {
-      label: "Change",
-      value: `${change > 0 ? "+" : ""}${change}`,
-      color:
-        change > 0 ? "text-emerald-400" : change < 0 ? "text-red-400" : "text-slate-300",
-    },
-  ];
-
-  return (
-    <section className={card}>
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-base font-semibold">Score Trend</h2>
-        <span className="text-xs text-slate-500">last {trend.points.length} reviews</span>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2 mt-3">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5">
-            <div className="text-[10px] uppercase tracking-wide text-slate-500">{s.label}</div>
-            <div className={`text-lg font-semibold leading-tight ${s.color}`}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto mt-3"
-        role="img"
-        aria-label="Line chart of review scores over time"
-      >
-        {gridValues.map((v) => {
-          const y = PAD + (1 - v / 100) * (H - PAD * 2);
-          return (
-            <g key={v}>
-              <line x1={PAD} x2={W - PAD} y1={y} y2={y} stroke="#1e293b" strokeWidth="1" />
-              <text x={PAD - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#64748b">
-                {v}
-              </text>
-            </g>
-          );
-        })}
-        <polyline
-          points={line}
-          fill="none"
-          stroke="#6366f1"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        {coords.map((c, i) => (
-          <circle key={i} cx={c.x} cy={c.y} r="4" fill={scoreHex(trend.points[i].score)}>
-            <title>
-              {`${trend.points[i].score}/100 - ${new Date(
-                trend.points[i].createdAt
-              ).toLocaleString()}`}
-            </title>
-          </circle>
-        ))}
-      </svg>
-    </section>
-  );
-}
-
-export default function Home() {
-  const [mode, setMode] = useState<"snippet" | "github">("snippet");
-  const [code, setCode] = useState("");
-  const [githubUrl, setGithubUrl] = useState("");
-  const [focus, setFocus] = useState("general");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [review, setReview] = useState<Review | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-
-  async function loadHistory() {
-    try {
-      const res = await fetch("/api/history");
-      const data = await res.json();
-      if (res.ok) setHistory(data.reviews);
-    } catch {
-      // silent - history is non-critical
-    }
-  }
-
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setReview(null);
-
-    try {
-      const res = await fetch("/api/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          mode === "snippet" ? { mode, code, focus } : { mode, githubUrl, focus }
-        ),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Review failed");
-      }
-      setReview(data.review);
-      loadHistory();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const counts = review
-    ? {
-        critical: review.issues.filter((i) => i.severity === "critical").length,
-        warning: review.issues.filter((i) => i.severity === "warning").length,
-        suggestion: review.issues.filter((i) => i.severity === "suggestion").length,
-      }
-    : null;
-
-  return (
-    <main className="max-w-6xl mx-auto px-4 py-8">
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">AI Code Reviewer</h1>
-        <p className="text-slate-400 mt-1">
-          Paste a snippet or drop a GitHub file / PR URL to get an instant AI review.
-        </p>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-        {/* LEFT: input + result */}
-        <div className="lg:col-span-3 space-y-5">
-          <form onSubmit={handleSubmit} className={card}>
-            <div className="flex gap-2 mb-4">
-              {(["snippet", "github"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-                    mode === m
-                      ? "bg-indigo-500 text-white"
-                      : "bg-slate-800 text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  {m === "snippet" ? "Paste Code" : "GitHub URL"}
-                </button>
-              ))}
-            </div>
-
-            {mode === "snippet" ? (
-              <textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="Paste your code here..."
-                rows={9}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            ) : (
-              <input
-                type="url"
-                value={githubUrl}
-                onChange={(e) => setGithubUrl(e.target.value)}
-                placeholder="https://github.com/owner/repo/blob/main/src/file.ts or .../pull/123"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            )}
-
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-3">
-              <div className="flex-1">
-                <label htmlFor="focus" className="block text-xs text-slate-400 mb-1">
-                  Review focus
-                </label>
-                <select
-                  id="focus"
-                  value={focus}
-                  onChange={(e) => setFocus(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  {focusOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-6 py-2 rounded-lg transition"
-              >
-                {loading ? "Reviewing..." : "Run Review"}
-              </button>
-            </div>
-          </form>
-
-          {error && (
-            <div className="border border-red-500/40 bg-red-500/10 text-red-300 rounded-lg p-3 text-sm">
-              {error}
-            </div>
-          )}
-
-          {loading && (
-            <div className={`${card} animate-pulse text-slate-400 text-sm`}>
-              Analysing your code...
-            </div>
-          )}
-
-          {!review && !loading && !error && (
-            <div className={`${card} text-center text-slate-500 text-sm py-10`}>
-              Your review will appear here.
-            </div>
-          )}
-
-          {review && counts && (
-            <section className={card}>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold">Review Result</h2>
-                  <p className="text-slate-400 text-sm mt-0.5">{review.language}</p>
-                </div>
-                <ScoreBadge score={review.score} />
-              </div>
-
-              <p className="mt-3 text-slate-200 text-sm leading-relaxed">{review.summary}</p>
-
-              <div className="flex flex-wrap gap-2 mt-4">
-                {(["critical", "warning", "suggestion"] as const).map((s) => (
-                  <span
-                    key={s}
-                    className={`border rounded-full px-3 py-0.5 text-xs font-medium ${severityStyles[s]}`}
-                  >
-                    {counts[s]} {s}
-                  </span>
-                ))}
-              </div>
-
-              <div className="mt-4 space-y-3 max-h-[26rem] overflow-y-auto pr-1">
-                {review.issues.map((issue, i) => (
-                  <div
-                    key={i}
-                    className={`border rounded-lg p-3 ${severityStyles[issue.severity] || severityStyles.suggestion}`}
-                  >
-                    <div className="flex items-center justify-between text-xs uppercase tracking-wide font-semibold opacity-80">
-                      <span>{issue.severity}</span>
-                      {issue.line !== null && <span>Line {issue.line}</span>}
-                    </div>
-                    <div className="mt-1 font-medium text-slate-100">{issue.title}</div>
-                    <p className="text-sm text-slate-300 mt-1">{issue.description}</p>
-                    <p className="text-sm mt-2 text-slate-400">
-                      <span className="font-medium text-slate-300">Suggestion: </span>
-                      {issue.suggestion}
-                    </p>
-                  </div>
-                ))}
-                {review.issues.length === 0 && (
-                  <p className="text-sm text-slate-400">No issues found. Nice work!</p>
-                )}
-              </div>
-            </section>
-          )}
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Link
+            href="/review"
+            className="bg-indigo-500 hover:bg-indigo-400 text-white font-medium px-6 py-3 rounded-lg transition"
+          >
+            Try a review
+          </Link>
+          <a
+            href="https://github.com/tanmay-1208/ai-code-reviewer"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-6 py-3 rounded-lg transition"
+          >
+            View on GitHub
+          </a>
         </div>
+      </section>
 
-        {/* RIGHT: trend + history */}
-        <aside className="lg:col-span-2 space-y-5 lg:sticky lg:top-6">
-          <ScoreTrend history={history} />
-
-          <section className={card}>
-            <h2 className="text-base font-semibold mb-3">Recent Reviews</h2>
-            {history.length === 0 ? (
-              <p className="text-sm text-slate-500">No reviews yet.</p>
-            ) : (
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {history.map((h) => (
-                  <div
-                    key={h.id}
-                    className="border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between gap-3 bg-slate-950"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm text-slate-200 truncate">
-                        {h.sourceRef || `Snippet review (${h.language || "unknown"})`}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {new Date(h.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <div
-                      className="text-sm font-semibold shrink-0"
-                      style={{ color: scoreHex(h.score) }}
-                    >
-                      {h.score}/100
-                    </div>
-                  </div>
-                ))}
+      {/* Sample result preview */}
+      <section className="max-w-2xl mx-auto -mt-4 mb-20">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-2xl shadow-indigo-500/5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm font-semibold">Review Result</div>
+              <div className="text-xs text-slate-500">JavaScript · Security focus</div>
+            </div>
+            <div className="text-3xl font-bold text-red-400">
+              42<span className="text-sm text-slate-400 font-normal">/100</span>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2 text-left">
+            <div className="border border-red-500/40 bg-red-500/10 text-red-300 rounded-lg p-3">
+              <div className="flex justify-between text-xs uppercase font-semibold opacity-80">
+                <span>Critical</span>
+                <span>Line 15</span>
               </div>
-            )}
-          </section>
-        </aside>
-      </div>
+              <div className="mt-1 text-sm font-medium text-slate-100">SQL injection vulnerability</div>
+              <p className="text-xs text-slate-400 mt-1">
+                Use parameterised queries instead of joining user input into the SQL string.
+              </p>
+            </div>
+            <div className="border border-amber-500/40 bg-amber-500/10 text-amber-300 rounded-lg p-3">
+              <div className="flex justify-between text-xs uppercase font-semibold opacity-80">
+                <span>Warning</span>
+                <span>Line 17</span>
+              </div>
+              <div className="mt-1 text-sm font-medium text-slate-100">Cross-site scripting (XSS) risk</div>
+              <p className="text-xs text-slate-400 mt-1">Escape the name before inserting it into HTML.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="pb-20">
+        <h2 className="text-2xl font-bold text-center">Everything you need for a quick review</h2>
+        <div className="grid sm:grid-cols-2 gap-4 mt-8">
+          {features.map((f) => (
+            <div key={f.title} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="font-semibold">{f.title}</h3>
+              <p className="text-sm text-slate-400 mt-2 leading-relaxed">{f.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="pb-20">
+        <h2 className="text-2xl font-bold text-center">How it works</h2>
+        <div className="grid sm:grid-cols-3 gap-4 mt-8">
+          {steps.map((s) => (
+            <div key={s.n} className="text-center px-4">
+              <div className="mx-auto w-10 h-10 rounded-full bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 flex items-center justify-center font-semibold">
+                {s.n}
+              </div>
+              <h3 className="font-semibold mt-3">{s.title}</h3>
+              <p className="text-sm text-slate-400 mt-1">{s.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Stack */}
+      <section className="pb-20 text-center">
+        <h2 className="text-2xl font-bold">Built with</h2>
+        <div className="flex flex-wrap justify-center gap-2 mt-6">
+          {stack.map((s) => (
+            <span
+              key={s}
+              className="text-sm text-slate-300 bg-slate-900 border border-slate-800 rounded-full px-4 py-1.5"
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="mb-16 bg-gradient-to-br from-indigo-500/15 to-sky-500/10 border border-indigo-500/30 rounded-2xl p-10 text-center">
+        <h2 className="text-2xl font-bold">Ready to review your code?</h2>
+        <p className="text-slate-400 mt-2">No sign-up needed. Paste some code and see.</p>
+        <Link
+          href="/review"
+          className="inline-block mt-6 bg-indigo-500 hover:bg-indigo-400 text-white font-medium px-6 py-3 rounded-lg transition"
+        >
+          Open the reviewer
+        </Link>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-800 py-8 text-center text-sm text-slate-500">
+        <p>
+          Group 10 · {team.join(" · ")}
+        </p>
+        <p className="mt-1">B.Tech CSE · BCSJ0962 Mini Project II · Mentor: Mr. Debasish Chakraborty</p>
+      </footer>
     </main>
   );
 }
