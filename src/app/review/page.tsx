@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { buildTrend, toSvgPoints } from "@/lib/trend";
+import ComparisonBanner from "@/components/ComparisonBanner";
 
 interface ReviewIssue {
   severity: "critical" | "warning" | "suggestion";
@@ -159,6 +160,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<Review | null>(null);
+  const [previous, setPrevious] = useState<Review | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   async function loadHistory() {
@@ -177,6 +179,7 @@ export default function Home() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const prevReview = review;
     setLoading(true);
     setError(null);
     setReview(null);
@@ -194,6 +197,7 @@ export default function Home() {
         throw new Error(data.error || "Review failed");
       }
       setReview(data.review);
+      setPrevious(prevReview);
       loadHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -213,14 +217,14 @@ export default function Home() {
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
       <header className="mb-6">
-  <Link href="/" className="text-sm text-slate-500 hover:text-slate-300 transition">
-    ← Home
-  </Link>
-  <h1 className="text-3xl font-bold tracking-tight mt-2">AI Code Reviewer</h1>
-  <p className="text-slate-400 mt-1">
-    Paste a snippet or drop a GitHub file / PR URL to get an instant AI review.
-  </p>
-</header>
+        <Link href="/" className="text-sm text-slate-500 hover:text-slate-300 transition">
+          ← Home
+        </Link>
+        <h1 className="text-3xl font-bold tracking-tight mt-2">AI Code Reviewer</h1>
+        <p className="text-slate-400 mt-1">
+          Paste a snippet or drop a GitHub file / PR URL to get an instant AI review.
+        </p>
+      </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* LEFT: input + result */}
@@ -318,6 +322,8 @@ export default function Home() {
               </div>
 
               <p className="mt-3 text-slate-200 text-sm leading-relaxed">{review.summary}</p>
+
+              {previous && <ComparisonBanner before={previous} after={review} />}
 
               <div className="flex flex-wrap gap-2 mt-4">
                 {(["critical", "warning", "suggestion"] as const).map((s) => (

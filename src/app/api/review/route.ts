@@ -2,11 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { reviewCode, isReviewFocus } from "@/lib/groq";
 import { fetchGithubContent } from "@/lib/github";
+import { withRetry } from "@/lib/retry";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const maxDuration = 60;
 
+// 10 reviews per minute per visitor protects the free Groq quota.
+const RATE_LIMIT = { limit: 10, windowMs: 60_000 };
+
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
+    const rl = checkRateLimit(ip, RATE_LIMIT);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Too many reviews. Please wait ${rl.retryAfterSec}s and try again.` },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } }
+      );
+    }
+
     const body = await req.json();
     const { mode, code, githubUrl, focus } = body as {
       mode: "snippet" | "github";
@@ -48,17 +62,20 @@ export async function POST(req: NextRequest) {
       isReviewFocus(focus) ? focus : "general"
     );
 
-    const saved = await prisma.review.create({
-      data: {
-        source: mode,
-        sourceRef,
-        language: result.language,
-        summary: result.summary,
-        issues: result.issues as unknown as object,
-        score: result.score,
-        rawCode: codeToReview,
-      },
-    });
+    // Retry the save so a Neon cold start does not lose a finished review.
+    const saved = await withRetry(() =>
+      prisma.review.create({
+        data: {
+          source: mode,
+          sourceRef,
+          language: result.language,
+          summary: result.summary,
+          issues: result.issues as unknown as object,
+          score: result.score,
+          rawCode: codeToReview,
+        },
+      })
+    );
 
     return NextResponse.json({ review: saved });
   } catch (err) {
