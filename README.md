@@ -6,6 +6,8 @@ score and issue list. Every review is saved to Postgres so you get a history vie
 
 **Stack:** Next.js 14 (App Router, TypeScript) · Tailwind CSS · Prisma · PostgreSQL · Groq API
 
+https://ai-code-reviewer-one-phi.vercel.app/
+
 ## Features
 - Paste any code snippet directly
 - Or paste a GitHub URL:
