@@ -158,6 +158,8 @@ export default function Home() {
   const [githubUrl, setGithubUrl] = useState("");
   const [focus, setFocus] = useState("general");
   const [loading, setLoading] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [previous, setPrevious] = useState<Review | null>(null);
@@ -203,6 +205,49 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Open a saved review from the history list.
+  async function openReview(id: string) {
+    setError(null);
+    setOpening(true);
+    try {
+      const res = await fetch(`/api/review/${id}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Could not open review");
+      }
+      setReview(data.review);
+      setPrevious(null); // a past review has no "previous run" to compare with
+      setTimeout(() => {
+        document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open review");
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  // Delete a saved review after confirmation.
+  async function deleteReview(id: string) {
+    if (!window.confirm("Delete this review? This cannot be undone.")) return;
+    setError(null);
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/review/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Could not delete review");
+      }
+      setHistory((h) => h.filter((item) => item.id !== id));
+      if (review?.id === id) setReview(null);
+      if (previous?.id === id) setPrevious(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete review");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -305,18 +350,33 @@ export default function Home() {
             </div>
           )}
 
-          {!review && !loading && !error && (
+          {opening && (
+            <div className={`${card} animate-pulse text-slate-400 text-sm`}>
+              Loading saved review...
+            </div>
+          )}
+
+          {!review && !loading && !opening && !error && (
             <div className={`${card} text-center text-slate-500 text-sm py-10`}>
               Your review will appear here.
             </div>
           )}
 
-          {review && counts && (
-            <section className={card}>
+          {review && counts && !opening && (
+            <section id="result" className={`${card} scroll-mt-6`}>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold">Review Result</h2>
-                  <p className="text-slate-400 text-sm mt-0.5">{review.language}</p>
+                  <p className="text-slate-400 text-sm mt-0.5">
+                    {review.language}
+                    <span className="text-slate-600"> · </span>
+                    {new Date(review.createdAt).toLocaleString()}
+                  </p>
+                  {review.sourceRef && (
+                    <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs sm:max-w-md">
+                      {review.sourceRef}
+                    </p>
+                  )}
                 </div>
                 <ScoreBadge score={review.score} />
               </div>
@@ -367,7 +427,12 @@ export default function Home() {
           <ScoreTrend history={history} />
 
           <section className={card}>
-            <h2 className="text-base font-semibold mb-3">Recent Reviews</h2>
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="text-base font-semibold">Recent Reviews</h2>
+              {history.length > 0 && (
+                <span className="text-xs text-slate-500">Click to open</span>
+              )}
+            </div>
             {history.length === 0 ? (
               <p className="text-sm text-slate-500">No reviews yet.</p>
             ) : (
@@ -375,22 +440,41 @@ export default function Home() {
                 {history.map((h) => (
                   <div
                     key={h.id}
-                    className="border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between gap-3 bg-slate-950"
+                    className={`border rounded-lg flex items-stretch bg-slate-950 transition ${
+                      review?.id === h.id ? "border-indigo-500/60" : "border-slate-800"
+                    } ${deletingId === h.id ? "opacity-40" : ""}`}
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm text-slate-200 truncate">
-                        {h.sourceRef || `Snippet review (${h.language || "unknown"})`}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {new Date(h.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <div
-                      className="text-sm font-semibold shrink-0"
-                      style={{ color: scoreHex(h.score) }}
+                    <button
+                      type="button"
+                      onClick={() => openReview(h.id)}
+                      disabled={opening || deletingId === h.id}
+                      className="flex-1 min-w-0 text-left px-3 py-2 flex items-center justify-between gap-3 hover:bg-slate-900 rounded-l-lg transition"
                     >
-                      {h.score}/100
-                    </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-slate-200 truncate">
+                          {h.sourceRef || `Snippet review (${h.language || "unknown"})`}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {new Date(h.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <div
+                        className="text-sm font-semibold shrink-0"
+                        style={{ color: scoreHex(h.score) }}
+                      >
+                        {h.score}/100
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteReview(h.id)}
+                      disabled={deletingId === h.id}
+                      aria-label="Delete review"
+                      title="Delete review"
+                      className="px-3 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-r-lg border-l border-slate-800 transition"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
