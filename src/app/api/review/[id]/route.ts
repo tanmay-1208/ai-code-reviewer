@@ -1,18 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withRetry } from "@/lib/retry";
+import { getOwnerId } from "@/lib/owner";
 
 // Always read live data; never cache or pre-render.
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: { id: string } };
 
-// GET /api/review/:id - full saved review (including every issue).
-export async function GET(_req: Request, { params }: Ctx) {
+// GET /api/review/:id - one saved review, only if it belongs to this visitor.
+export async function GET(req: NextRequest, { params }: Ctx) {
   try {
+    const ownerId = getOwnerId(req);
+    if (!ownerId) {
+      return NextResponse.json({ error: "Review not found" }, { status: 404 });
+    }
+
     const review = await withRetry(() =>
-      prisma.review.findUnique({
-        where: { id: params.id },
+      prisma.review.findFirst({
+        where: { id: params.id, ownerId },
         select: {
           id: true,
           source: true,
@@ -35,13 +41,18 @@ export async function GET(_req: Request, { params }: Ctx) {
   }
 }
 
-// DELETE /api/review/:id - remove a saved review.
-// deleteMany is used so the call is safe to retry and a missing row is a
-// clean 404 rather than a thrown error.
-export async function DELETE(_req: Request, { params }: Ctx) {
+// DELETE /api/review/:id - delete a review, only if it belongs to this visitor.
+// deleteMany keeps the call retry-safe and turns "not yours / not found" into
+// a clean 404 instead of a thrown error.
+export async function DELETE(req: NextRequest, { params }: Ctx) {
   try {
+    const ownerId = getOwnerId(req);
+    if (!ownerId) {
+      return NextResponse.json({ error: "Review not found" }, { status: 404 });
+    }
+
     const result = await withRetry(() =>
-      prisma.review.deleteMany({ where: { id: params.id } })
+      prisma.review.deleteMany({ where: { id: params.id, ownerId } })
     );
     if (result.count === 0) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });

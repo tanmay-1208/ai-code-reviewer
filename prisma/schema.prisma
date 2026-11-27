@@ -17,4 +17,7 @@ model Review {
   score       Int      // 0-100 overall quality score
   rawCode     String   @db.Text
   createdAt   DateTime @default(now())
+   ownerId   String?
+
+  @@index([ownerId, createdAt])
 }

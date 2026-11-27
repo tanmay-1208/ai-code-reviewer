@@ -4,6 +4,7 @@ import { reviewCode, isReviewFocus } from "@/lib/groq";
 import { fetchGithubContent } from "@/lib/github";
 import { withRetry } from "@/lib/retry";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { getOwnerId, newOwnerId, OWNER_COOKIE, ownerCookieOptions } from "@/lib/owner";
 
 export const maxDuration = 60;
 
@@ -20,6 +21,10 @@ export async function POST(req: NextRequest) {
         { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } }
       );
     }
+
+    // Existing visitor keeps their id; a new visitor gets one with this request.
+    const existingOwner = getOwnerId(req);
+    const ownerId = existingOwner ?? newOwnerId();
 
     const body = await req.json();
     const { mode, code, githubUrl, focus } = body as {
@@ -66,6 +71,7 @@ export async function POST(req: NextRequest) {
     const saved = await withRetry(() =>
       prisma.review.create({
         data: {
+          ownerId,
           source: mode,
           sourceRef,
           language: result.language,
@@ -77,7 +83,11 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    return NextResponse.json({ review: saved });
+    const res = NextResponse.json({ review: saved });
+    if (!existingOwner) {
+      res.cookies.set(OWNER_COOKIE, ownerId, ownerCookieOptions());
+    }
+    return res;
   } catch (err) {
     console.error(err);
     const message = err instanceof Error ? err.message : "Unknown error";
